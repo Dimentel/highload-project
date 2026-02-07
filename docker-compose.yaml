@@ -1,0 +1,56 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: similar_movies_db
+    environment:
+      POSTGRES_USER: ${DB_USER:-similar_user}
+      POSTGRES_PASSWORD: ${DB_PASS:-similar_pass}
+      POSTGRES_DB: ${DB_NAME:-similar_movies}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-similar_user} -d ${DB_NAME:-similar_movies}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - movies_network
+
+  web:
+    build: .
+    container_name: similar_movies_app
+    command: >
+      sh -c "
+      echo 'Waiting for PostgreSQL...' &&
+      while ! nc -z db 5432; do
+        sleep 1
+      done &&
+      echo 'PostgreSQL started' &&
+      python manage.py migrate --noinput &&
+      python manage.py runserver 0.0.0.0:8000
+      "
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=${DB_USER:-similar_user}
+      - DB_PASS=${DB_PASS:-similar_pass}
+      - DB_NAME=${DB_NAME:-similar_movies}
+      - DATABASE_URL=postgresql://${DB_USER:-similar_user}:${DB_PASS:-similar_pass}@db:5432/${DB_NAME:-similar_movies}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - movies_network
+
+volumes:
+  postgres_data:
+
+networks:
+  movies_network:
+    driver: bridge
