@@ -1,5 +1,5 @@
-# Python review 2 Django web service
-
+# Movie Similarity Service (Python review 2 Django web service)
+Сервис для поиска похожих фильмов по сюжетам из Wikipedia.
 ## Необходимые пакеты
     - django (легко устанавливается с помощью pip)
     - pickle
@@ -9,6 +9,22 @@
     - requests
 
 ## Запускаем сервер
+### С Docker (рекомендуется)
+**1. Соберите образ:**
+   ```bash
+   docker build -t similar-movies .
+   ```
+**2. Запустите контейнер:**
+   ```bash
+   docker run -p 8000:8000 similar-movies
+   ```
+**3. Обучение модели:**  
+Откройте в браузере http://localhost:8000/train/ и дождитесь завершения.
+
+**4. Поиск похожих фильмов:**  
+На главной http://localhost:8000/ введите URL Wikipedia фильма и выберите количество результатов.
+
+### Без Docker
 Находясь в папке с файлом manage.py (корневой каталог репозитория) выполняем команду python manage.py runserver
 
 ## Функционал сервиса

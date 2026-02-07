@@ -1,0 +1,17 @@
+.git/
+.gitignore
+.idea/
+*.pyc
+__pycache__/
+*.sqlite3
+*.npz
+*.pickle
+venv/
+env/
+Dockerfile
+docker-compose.yml
+README.md
+*.log
+db.sqlite3
+data.npz
+model.pickle
