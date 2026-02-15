@@ -125,3 +125,69 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 # Default primary key field type
 # https://docs.djangoproject.com/en/3.2/ref/settings/#default-auto-field
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Celery Configuration
+CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'amqp://guest:guest@localhost:5672//')
+CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', 'rpc://')
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_ACCEPT_CONTENT = os.environ.get('CELERY_ACCEPT_CONTENT', 'json').split(',')
+CELERY_TIMEZONE = 'UTC'
+CELERY_ENABLE_UTC = True
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_ACKS_LATE = True
+CELERY_TASK_REJECT_ON_WORKER_LOST = True
+CELERY_TASK_RETRY_DELAY = 300  # 5 минут
+CELERY_TASK_MAX_RETRIES = 3
+CELERY_WORKER_CONCURRENCY = int(os.environ.get('CELERY_WORKER_CONCURRENCY', 3))
+CELERY_WORKER_PREFETCH_MULTIPLIER = int(os.environ.get('CELERY_WORKER_PREFETCH_MULTIPLIER', 4))
+
+# Очереди
+CELERY_TASK_QUEUES = {
+    'train_queue': {
+        'exchange': 'movies_exchange',
+        'routing_key': 'train',
+        'queue_arguments': {
+            'x-dead-letter-exchange': 'movies_dlx',
+            'x-dead-letter-routing-key': 'train_rejected',
+            'x-max-retries': 3,
+        }
+    },
+    'similar_queue': {
+        'exchange': 'movies_exchange',
+        'routing_key': 'similar',
+        'queue_arguments': {
+            'x-dead-letter-exchange': 'movies_dlx',
+            'x-dead-letter-routing-key': 'similar_rejected',
+            'x-max-retries': 3,
+        }
+    },
+    'train_rejected': {
+        'exchange': 'movies_dlx',
+        'routing_key': 'train_rejected',
+    },
+    'similar_rejected': {
+        'exchange': 'movies_dlx',
+        'routing_key': 'similar_rejected',
+    }
+}
+
+# Маршрутизация задач
+CELERY_TASK_ROUTES = {
+    'train_model': {'queue': 'train_queue', 'routing_key': 'train'},
+    'find_similar': {'queue': 'similar_queue', 'routing_key': 'similar'},
+}
+
+# Настройки для Dead Letter Queue
+CELERY_TASK_ANNOTATIONS = {
+    'train_model': {
+        'rate_limit': '1/m',  # Не чаще 1 раза в минуту
+        'acks_late': True,
+        'reject_on_worker_lost': True,
+    },
+    'find_similar': {
+        'rate_limit': '10/m',  # Не чаще 10 раз в минуту
+        'acks_late': True,
+        'reject_on_worker_lost': True,
+    }
+}

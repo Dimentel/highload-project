@@ -1,136 +1,216 @@
 import os
-from heapq import heappush, heappop
-import pickle
-import requests
 
-from django.shortcuts import render
-import wikipedia
-from sklearn.feature_extraction.text import TfidfVectorizer
-import scipy.sparse
-import pandas as pd
-import bs4
+from django.shortcuts import render, get_object_or_404
+from django.http import JsonResponse, HttpResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.utils import timezone
+from django.conf import settings
+import json
+
+from main.models import Article, TaskStatus
+from main.tasks import train_model, find_similar
 
 import logging
 
 # Настройка логирования
 logging.basicConfig(
-    level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-from main.models import Article
-
 
 def index(request):
-    if os.path.exists('model.pickle') and os.path.exists('data.npz'):
+    if Article.objects.exists():
         return render(request, 'main/index.html')
     return render(request, 'main/need_train.html')
 
 
+@csrf_exempt
 def train(request):
-    max_articles_train = int(os.environ.get('num_articles', 1000))
-    logger.info(f"Starting training with {max_articles_train} articles")
+    """
+    Асинхронное обучение модели
+    """
+    if request.method == 'POST':
+        # Создаем задачу
+        num_articles = request.POST.get('num_articles', os.environ.get('num_articles', 1000))
 
-    Article.objects.all().delete()
-    try:
-        data = pd.read_csv('wiki_movie_plots_deduped.csv').sample(max_articles_train)
-        logger.info(f"Loaded dataset with {len(data)} rows")
-    except Exception as e:
-        logger.error(f"Failed to load CSV: {e}")
-        return render(request, 'main/error.html')
-    text_corpus = list(data.Plot)
+        # Отправляем задачу в Celery и сразу получаем её ID
+        result = train_model.delay(int(num_articles))
+        celery_task_id = result.id
 
-    articles = [Article(number=i, title=data.iloc[i].Title[:100], url=data.iloc[i]['Wiki Page'][:100], summary=data.iloc[i].Plot[:4000])
-                for i in range(data.shape[0])]
-
-    Article.objects.bulk_create(articles)
-
-    model = TfidfVectorizer(analyzer='word', stop_words='english', strip_accents='ascii')
-    param_matrix = model.fit_transform(text_corpus)
-
-    if os.path.exists("model.pickle"):
-        os.remove("model.pickle")
-
-    if os.path.exists("data.npz"):
-        os.remove("data.npz")
-
-    with open('model.pickle', 'wb') as f:
-        pickle.dump(model, f)
-    scipy.sparse.save_npz('data.npz', param_matrix)
-    logger.info("Model training completed successfully")
-
-    return render(request, 'main/train.html')
+        # Создаем запись о задаче в БД
+        task = TaskStatus.objects.create(
+            task_type='train',
+            task_id=celery_task_id,
+            status='PENDING',
+            params={'num_articles': int(num_articles)}
+        )
 
 
+
+        # Обновляем task_id от Celery (он появится асинхронно)
+        # В реальности task_id известен сразу, можно получить из задачи
+        # Для простоты используем ID нашей записи
+
+        return JsonResponse({
+            'task_id': str(task.id),
+            'status': 'PENDING',
+            'message': 'Training task created'
+        })
+
+    # GET запрос - показываем форму
+    return render(request, 'main/train_form.html')
+
+
+@csrf_exempt
 def get_similar(request):
+    """
+    Асинхронный поиск похожих фильмов
+    """
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        url = data.get('url')
+        cnt = data.get('cnt', 5)
+
+        if not url:
+            return JsonResponse({'error': 'URL is required'}, status=400)
+
+        # Отправляем задачу
+        result = find_similar.delay(url, cnt)
+        celery_task_id = result.id
+
+        # Создаем запись о задаче в БД
+        task = TaskStatus.objects.create(
+            task_type='similar',
+            task_id=celery_task_id,
+            status='PENDING',
+            params={'url': url, 'cnt': cnt}
+        )
+
+        return JsonResponse({
+            'task_id': str(task.id),
+            'status': 'PENDING',
+            'message': 'Similarity search task created'
+        })
+
+    # GET запрос - показываем форму
+    return render(request, 'main/index.html')
+
+
+def task_status(request, task_id):
+    """
+    Получение статуса задачи
+    """
     try:
-        url = request.GET['url']
-        logger.info(f"Processing URL: {url}")
+        # Пытаемся найти задачу по нашему ID или по Celery task_id
+        task = TaskStatus.objects.get(id=task_id)
+    except TaskStatus.DoesNotExist:
+        try:
+            task = TaskStatus.objects.get(task_id=task_id)
+        except TaskStatus.DoesNotExist:
+            return JsonResponse({'error': 'Task not found'}, status=404)
 
-        cnt = int(request.GET['cnt'])
-        logger.info(f"Requested count: {cnt}")
+    response = {
+        'task_id': str(task.id),
+        'celery_task_id': task.task_id,
+        'task_type': task.task_type,
+        'status': task.status,
+        'created_at': task.created_at.isoformat() if task.created_at else None,
+        'updated_at': task.updated_at.isoformat() if task.updated_at else None,
+        'started_at': task.started_at.isoformat() if task.started_at else None,
+        'completed_at': task.completed_at.isoformat() if task.completed_at else None,
+    }
 
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers, timeout=10)
+    if task.status == 'SUCCESS':
+        response['result'] = task.result
+    elif task.status == 'FAILURE':
+        response['error'] = task.error_message
 
-        logger.info(f"Response status: {response.status_code}")
-        if response.status_code != 200:
-            if response.status_code == 404:
-                context = {'url': url}
-                return render(request, 'main/not_found.html', context)
-            else:
-                logger.error(f"Wikipedia error {response.status_code}")
-                return render(request, 'main/error.html')
-    except Exception as e:
-        logger.error(f"Exception during get_similar: {e}", exc_info=True)
-        return render(request, 'main/error.html')
-    if response:
-        html = bs4.BeautifulSoup(response.text, 'html.parser')
-        heading = html.select("#firstHeading")
-        if heading:
-            title = heading[0].text
-            logger.info(f"Extracted title: {title}")
-        else:
-            logger.error("No #firstHeading found on page")
-            return render(request, 'main/error.html')
-        title = html.select("#firstHeading")[0].text
+    return JsonResponse(response)
+
+
+def task_result(request, task_id):
+    """
+    Получение результата задачи (если завершена)
+    """
+    try:
+        task = TaskStatus.objects.get(id=task_id)
+    except TaskStatus.DoesNotExist:
+        return JsonResponse({'error': 'Task not found'}, status=404)
+
+    if task.status == 'SUCCESS':
+        return JsonResponse({
+            'task_id': str(task.id),
+            'status': task.status,
+            'result': task.result
+        })
+    elif task.status == 'FAILURE':
+        return JsonResponse({
+            'task_id': str(task.id),
+            'status': task.status,
+            'error': task.error_message
+        }, status=400)
     else:
-        context = {'url': url}
-        return render(request, 'main/not_found.html', context)
-    try:
-        page = wikipedia.page(title)
-        content = page.content
-    except wikipedia.exceptions.PageError as e:
-        logger.error(f"Wikipedia page not found: {title}")
-        context = {'url': url}
-        return render(request, 'main/error.html', context)
-    except wikipedia.exceptions.DisambiguationError as e:
-        logger.error(f"Disambiguation error for {title}: {e.options[:3]}")
-        return render(request, 'main/error.html')
-    except Exception as e:
-        logger.error(f"Unexpected error: {e}", exc_info=True)
-        return render(request, 'main/error.html')
-    if not os.path.exists('model.pickle') or not os.path.exists('data.npz'):
-        return render(request, 'main/need_train.html')
-    with open('model.pickle', 'rb') as model_file:
-        model = pickle.load(model_file)
-    data = scipy.sparse.load_npz('data.npz')
-    film_summary_vector = model.transform([content]).toarray()
-    row_number = 0
-    top = []
-    for row in data:
-        vec = row.toarray()
-        dist = scipy.spatial.distance.euclidean(vec.reshape(-1), film_summary_vector.reshape(-1))
-        heappush(top, (-dist, row_number))
-        if len(top) > cnt:
-            heappop(top)
-        row_number += 1
+        return JsonResponse({
+            'task_id': str(task.id),
+            'status': task.status,
+            'message': 'Task is not completed yet'
+        }, status=202)
 
-    top = sorted(top, reverse=True)
-    films = []
-    for dist, num in top:
-        film = Article.objects.get(number=num)
-        films.append(film)
-    context = {'films': films, 'query_film': page.title}
-    return render(request, 'main/get_similar.html', context)
+
+@csrf_exempt
+def update_task_status(request):
+    """
+    Эндпоинт для обратной связи от Celery worker (через сигналы)
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        task_id = data.get('task_id').lower()
+        status = data.get('status')
+        result = data.get('result')
+        error = data.get('error')
+
+        logger.info(f"=== update_task_status called ===")
+        logger.info(f"Looking for task with task_id={task_id}")
+
+        # Обновляем статус задачи
+        task = TaskStatus.objects.filter(task_id=task_id).first()
+        logger.info(f"Found by task_id: {task.id if task else 'None'}")
+
+        if not task:
+            # Если не нашли, посмотрим все задачи
+            all_tasks = TaskStatus.objects.all().values('id', 'task_id', 'status')
+            logger.info(f"Looking for {task_id}")
+            logger.info(f"All task_ids: {[t['task_id'] for t in all_tasks]}")
+
+            return JsonResponse({'status': 'not_found'}, status=404)
+
+        if task:
+            logger.info(f"Updating task {task.id} from {task.status} to {status}")
+            task.status = status
+            if status == 'STARTED':
+                task.started_at = timezone.now()
+                task.worker_id = data.get('worker_id', '')
+            elif status == 'SUCCESS':
+                task.completed_at = timezone.now()
+                task.result = result
+            elif status == 'FAILURE':
+                task.completed_at = timezone.now()
+                task.error_message = error or ''
+            elif status == 'RETRY':
+                task.retry_count += 1
+
+            task.save()
+
+            return JsonResponse({'status': 'updated'})
+        else:
+            # Логируем, но не создаём новую запись
+            logger.warning(f"Task {task_id} not found")
+            return JsonResponse({'status': 'not_found'}, status=404)
+
+    except Exception as e:
+        logger.error(f"Error updating task status: {e}")
+        return JsonResponse({'error': str(e)}, status=500)
