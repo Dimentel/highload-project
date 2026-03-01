@@ -11,64 +11,68 @@ https://docs.djangoproject.com/en/2.2/ref/settings/
 """
 
 import os
+from pathlib import Path
+
 import dj_database_url
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/2.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'q*0k1$li$e6zj7@$@u^zs*9zg9t-fuj*^!(xxizd!^x%usqt%+')
+SECRET_KEY = os.environ.get(
+    "DJANGO_SECRET_KEY", "q*0k1$li$e6zj7@$@u^zs*9zg9t-fuj*^!(xxizd!^x%usqt%+"
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
+DEBUG = os.environ.get("DJANGO_DEBUG", "True") == "True"
 
-ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
 # Application definition
 
 INSTALLED_APPS = [
-    'main.apps.MainConfig',
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
+    "main.apps.MainConfig",
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
 ]
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ROOT_URLCONF = 'review2.urls'
+ROOT_URLCONF = "review2.urls"
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = 'review2.wsgi.application'
+WSGI_APPLICATION = "review2.wsgi.application"
 
 
 # Database
@@ -77,9 +81,8 @@ WSGI_APPLICATION = 'review2.wsgi.application'
 # Use DATABASE_URL from environment or fallback to SQLite for development
 
 DATABASES = {
-    'default': dj_database_url.config(
-        default=f"sqlite:///{os.path.join(BASE_DIR, 'db.sqlite3')}",
-        conn_max_age=600
+    "default": dj_database_url.config(
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}", conn_max_age=600
     )
 }
 
@@ -88,16 +91,16 @@ DATABASES = {
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
 
@@ -105,9 +108,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/2.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = "UTC"
 
 USE_I18N = True
 
@@ -119,75 +122,85 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/2.2/howto/static-files/
 
-STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATIC_URL = "/static/"
+STATIC_ROOT = "/staticfiles"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/3.2/ref/settings/#default-auto-field
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Celery Configuration
-CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'amqp://guest:guest@localhost:5672//')
-CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', 'rpc://')
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
-CELERY_ACCEPT_CONTENT = os.environ.get('CELERY_ACCEPT_CONTENT', 'json').split(',')
-CELERY_TIMEZONE = 'UTC'
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "amqp://guest:guest@localhost:5672//")
+CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", "rpc://")
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_ACCEPT_CONTENT = os.environ.get("CELERY_ACCEPT_CONTENT", "json").split(",")
+CELERY_TIMEZONE = "UTC"
 CELERY_ENABLE_UTC = True
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_ACKS_LATE = True
 CELERY_TASK_REJECT_ON_WORKER_LOST = True
 CELERY_TASK_RETRY_DELAY = 300  # 5 минут
 CELERY_TASK_MAX_RETRIES = 3
-CELERY_WORKER_CONCURRENCY = int(os.environ.get('CELERY_WORKER_CONCURRENCY', 3))
-CELERY_WORKER_PREFETCH_MULTIPLIER = int(os.environ.get('CELERY_WORKER_PREFETCH_MULTIPLIER', 4))
+CELERY_WORKER_CONCURRENCY = int(os.environ.get("CELERY_WORKER_CONCURRENCY", 3))
+CELERY_WORKER_PREFETCH_MULTIPLIER = int(os.environ.get("CELERY_WORKER_PREFETCH_MULTIPLIER", 4))
 
 # Очереди
 CELERY_TASK_QUEUES = {
-    'train_queue': {
-        'exchange': 'movies_exchange',
-        'routing_key': 'train',
-        'queue_arguments': {
-            'x-dead-letter-exchange': 'movies_dlx',
-            'x-dead-letter-routing-key': 'train_rejected',
-            'x-max-retries': 3,
-        }
+    "train_queue": {
+        "exchange": "movies_exchange",
+        "routing_key": "train",
+        "queue_arguments": {
+            "x-dead-letter-exchange": "movies_dlx",
+            "x-dead-letter-routing-key": "train_rejected",
+            "x-max-retries": 3,
+        },
     },
-    'similar_queue': {
-        'exchange': 'movies_exchange',
-        'routing_key': 'similar',
-        'queue_arguments': {
-            'x-dead-letter-exchange': 'movies_dlx',
-            'x-dead-letter-routing-key': 'similar_rejected',
-            'x-max-retries': 3,
-        }
+    "similar_queue": {
+        "exchange": "movies_exchange",
+        "routing_key": "similar",
+        "queue_arguments": {
+            "x-dead-letter-exchange": "movies_dlx",
+            "x-dead-letter-routing-key": "similar_rejected",
+            "x-max-retries": 3,
+        },
     },
-    'train_rejected': {
-        'exchange': 'movies_dlx',
-        'routing_key': 'train_rejected',
+    "train_rejected": {
+        "exchange": "movies_dlx",
+        "routing_key": "train_rejected",
     },
-    'similar_rejected': {
-        'exchange': 'movies_dlx',
-        'routing_key': 'similar_rejected',
-    }
+    "similar_rejected": {
+        "exchange": "movies_dlx",
+        "routing_key": "similar_rejected",
+    },
 }
 
 # Маршрутизация задач
 CELERY_TASK_ROUTES = {
-    'train_model': {'queue': 'train_queue', 'routing_key': 'train'},
-    'find_similar': {'queue': 'similar_queue', 'routing_key': 'similar'},
+    "train_model": {"queue": "train_queue", "routing_key": "train"},
+    "find_similar": {"queue": "similar_queue", "routing_key": "similar"},
 }
 
 # Настройки для Dead Letter Queue
 CELERY_TASK_ANNOTATIONS = {
-    'train_model': {
-        'rate_limit': '1/m',  # Не чаще 1 раза в минуту
-        'acks_late': True,
-        'reject_on_worker_lost': True,
+    "train_model": {
+        "rate_limit": "1/m",  # No more than 1 task per minute
+        "acks_late": True,
+        "reject_on_worker_lost": True,
     },
-    'find_similar': {
-        'rate_limit': '10/m',  # Не чаще 10 раз в минуту
-        'acks_late': True,
-        'reject_on_worker_lost': True,
-    }
+    "find_similar": {
+        "rate_limit": "10/m",  # No more than 10 tasks per minute
+        "acks_late": True,
+        "reject_on_worker_lost": True,
+    },
 }
+
+# Security settings for production
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = False  # True если будет HTTPS
+    SESSION_COOKIE_SECURE = False  # True для HTTPS
+    CSRF_COOKIE_SECURE = False  # True для HTTPS
+
+# Trusted proxies (for nginx)
+USE_X_FORWARDED_HOST = True

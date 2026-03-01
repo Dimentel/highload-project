@@ -13,7 +13,7 @@
                     'X-CSRFToken': '{{ csrf_token }}'
                 },
                 body: JSON.stringify({
-                    num_articles: numArticles
+                    NUM_ARTICLES: numArticles
                 })
             })
             .then(response => response.json())

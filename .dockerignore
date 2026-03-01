@@ -15,3 +15,14 @@ README.md
 db.sqlite3
 data.npz
 model.pickle
+# Development files
+.pre-commit-config.yaml
+pyproject.toml
+requirements-dev.txt
+Dockerfile.dev
+.tox/
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/

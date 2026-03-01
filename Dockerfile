@@ -12,5 +12,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 ENV PYTHONUNBUFFERED=1
 EXPOSE 8000
-# Оставим для совместимости с предыдущими версиями
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+
+# Команда переопределяется также в docker-compose
+CMD ["gunicorn", "review2.wsgi:application", "--bind", "0.0.0.0:8000"]
