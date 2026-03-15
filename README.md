@@ -1,18 +1,12 @@
-# Movie Similarity Service (Python review 2 Django web service)
-Сервис для поиска похожих фильмов по сюжетам из Wikipedia.
+# Movie Similarity Service
+Сервис для поиска похожих фильмов по сюжетам из Wikipedia с асинхронной обработкой задач.
 ## Особенности
 - Поиск похожих фильмов по тексту сюжета с использованием TF-IDF
+- Асинхронная обработка через Celery + RabbitMQ
 - Веб-интерфейс для ввода URL Wikipedia страницы
 - Использование PostgreSQL для хранения данных
+- Мониторинг через Flower
 - Docker Compose для простого развертывания
-
-## Необходимые пакеты
-    - django (легко устанавливается с помощью pip)
-    - pickle
-    - wikipedia (так же устанавливается с помощью pip)
-    - numpy, scipy, pandas, sklearn
-    - bs4
-    - requests
 
 ## Запускаем сервер
 ### С Docker Compose (рекомендуется)
@@ -29,19 +23,24 @@
    ```bash
    docker-compose ps
    ```
-Должны быть запущены два сервиса: similar_movies_db и similar_movies_app   
+Должны быть запущены: similar_movies_db, similar_movies_app, similar_movies_celery, similar_movies_rmq, similar_movies_flower   
 
 **4. Инициализируйте данные:**  
 - Откройте в браузере http://localhost:8000/train/.
-- Дождитесь завершения обучения модели (загрузка датасета и обучение TF-IDF).
-- После обучения вы увидите сообщение "Model trained!"
+- Нажмите "Start Training" и дождитесь завершения
+- Статус обучения можно отслеживать на той же странице
 
 **5. Поиск похожих фильмов:**  
 - Перейдите на главную страницу: http://localhost:8000/.  
 - Введите URL Wikipedia страницы фильма (например: https://en.wikipedia.org/wiki/Inception).  
-- Выберите количество похожих фильмов для поиска (5, 10, 15, 20).
+- Выберите количество похожих фильмов для поиска (5, 10, 15, 20) и нажмите "Search".
+- Результаты появятся после завершения обработки
 
-**Конфигурация**  
+**Мониторинг:**  
+- Flower: http://localhost:5555 — мониторинг Celery задач  
+- RabbitMQ: http://localhost:15672 (логин: student, пароль: qwerty)
+
+**Конфигурация:**  
 Файл .env содержит настройки (создайте если отсутствует):
    ```bash
 # Database
@@ -55,7 +54,7 @@ DB_PORT=5432
 DJANGO_SETTINGS_MODULE=review2.settings
 DJANGO_SECRET_KEY=development-secret-key-change-in-production
 DJANGO_DEBUG=True
-DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
+DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,web
 
 # Application settings
 num_articles=1000
@@ -63,41 +62,42 @@ PYTHONUNBUFFERED=1
 
 # Database URL
 DATABASE_URL=postgresql://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}
-   ```
-**Управление контейнерами**
-   ```bash
-# Запуск
-docker-compose up -d
 
-# Остановка
-docker-compose down
+# RabbitMQ
+RABBITMQ_HOST=rmq
+RABBITMQ_PORT=5672
+RABBITMQ_USER=student
+RABBITMQ_PASSWORD=qwerty
+RABBITMQ_MANAGEMENT_PORT=15672
 
-# Просмотр логов
-docker-compose logs -f web
-docker-compose logs -f db
+# Celery
+CELERY_BROKER_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@${RABBITMQ_HOST}:${RABBITMQ_PORT}//
+CELERY_RESULT_BACKEND=rpc://
+CELERY_TASK_SERIALIZER=json
+CELERY_RESULT_SERIALIZER=json
+CELERY_ACCEPT_CONTENT=json
+CELERY_TIMEZONE=UTC
+CELERY_WORKER_CONCURRENCY=3
+CELERY_TASK_TRACK_STARTED=True
+CELERY_TASK_ACKS_LATE=True
+CELERY_TASK_REJECT_ON_WORKER_LOST=True
+CELERY_TASK_RETRY_DELAY=300
+CELERY_TASK_MAX_RETRIES=3
+TRAIN_MAX_RETRIES=3
+TRAIN_RETRY_DELAY=60
+SIMILAR_MAX_RETRIES=2
+SIMILAR_RETRY_DELAY=30
+CELERY_WORKER_PREFETCH_MULTIPLIER=4
 
-# Пересборка образа
-docker-compose build
+# Queues
+TRAIN_QUEUE=train_queue
+SIMILAR_QUEUE=similar_queue
 
-# Полная переустановка (с удалением данных)
-docker-compose down -v
-docker-compose up -d
-   ```
+# API URLs
+API_URL=http://web:8000
+UPDATE_TASK_STATUS_URL=${API_URL}/tasks/status/
 
-### Без Docker
-Находясь в папке с файлом manage.py (корневой каталог репозитория) выполняем действия.
-**1. Установите зависимости:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-**2. Настройте базу данных (SQLite по умолчанию):**
-   ```bash
-   python manage.py migrate
-   ```
-**3. Запустите сервер:**
-   ```bash
-   python manage.py runserver
-   ```
-Шаги 4-5 такие же, как при запуске с Docker.
-
-    
+# Timeouts
+TRAIN_TIMEOUT=300
+SIMILAR_TIMEOUT=60
+```

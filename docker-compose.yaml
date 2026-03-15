@@ -1,4 +1,22 @@
 services:
+  rmq:
+    image: rabbitmq:3-management-alpine
+    container_name: similar_movies_rmq
+    ports:
+      - "15672:15672"    # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-student}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-qwerty}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - movies_network
+
   db:
     image: postgres:15-alpine
     container_name: similar_movies_db
@@ -24,8 +42,13 @@ services:
       echo 'Waiting for PostgreSQL...' &&
       while ! nc -z db 5432; do
         sleep 1
-      done &&
+      done &&     
       echo 'PostgreSQL started' &&
+      echo 'Waiting for RabbitMQ...' &&
+      while ! nc -z rmq 5672; do
+        sleep 1
+      done &&
+      echo 'RabbitMQ started' &&
       python manage.py migrate --noinput &&
       python manage.py runserver 0.0.0.0:8000
       "
@@ -45,11 +68,69 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      rmq:
+        condition: service_healthy
+    networks:
+      - movies_network
+
+  celery_worker:
+    build: .
+    container_name: similar_movies_celery
+    command: >
+      sh -c "
+      echo 'Waiting for RabbitMQ...' &&
+      while ! nc -z rmq 5672; do
+        sleep 1
+      done &&
+      echo 'RabbitMQ started' &&
+      celery -A review2.celery_app worker --loglevel=info --concurrency=${CELERY_WORKER_CONCURRENCY:-3}
+      "
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=${DB_USER:-similar_user}
+      - DB_PASS=${DB_PASS:-similar_pass}
+      - DB_NAME=${DB_NAME:-similar_movies}
+      - DATABASE_URL=postgresql://${DB_USER:-similar_user}:${DB_PASS:-similar_pass}@db:5432/${DB_NAME:-similar_movies}
+      - RABBITMQ_HOST=rmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=${RABBITMQ_USER:-student}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-qwerty}
+    depends_on:
+      rmq:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    networks:
+      - movies_network
+
+  flower:
+    image: mher/flower:2.0
+    container_name: similar_movies_flower
+    command: celery flower --port=5555
+    ports:
+      - "5555:5555"
+    depends_on:
+      rmq:
+        condition: service_healthy
+      celery_worker:
+        condition: service_started
+    environment:
+      - CELERY_BROKER_URL=amqp://${RABBITMQ_USER:-student}:${RABBITMQ_PASSWORD:-qwerty}@rmq:5672//
+      - RABBITMQ_HOST=rmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=${RABBITMQ_USER:-student}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-qwerty}
     networks:
       - movies_network
 
 volumes:
   postgres_data:
+  rabbitmq_data:
 
 networks:
   movies_network:

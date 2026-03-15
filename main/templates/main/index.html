@@ -1,12 +1,75 @@
 {% if error_message %}<p><strong>{{ error_message }}</strong></p>{% endif %}
 
 <h1>Type your wikipedia page address here:</h1>
-<form action="{% url 'main:similar' %}" method="get">
-    <input size="70" style= "height: 30px;" type="text" name="url" />
-    <select style= "height: 30px; width: 70px;" name="cnt">
+<form id="searchForm">
+    <input size="70" style="height: 30px;" type="text" id="url" name="url" />
+    <select style="height: 30px; width: 70px;" id="cnt">
         <option selected value="5">5</option>
         <option value="10">10</option>
         <option value="15">15</option>
         <option value="20">20</option>
    </select>
+   <button type="submit">Search</button>
 </form>
+
+<div id="result" style="margin-top: 20px;"></div>
+
+<script>
+document.getElementById('searchForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const url = document.getElementById('url').value;
+    const cnt = document.getElementById('cnt').value;
+
+    // Показываем загрузку
+    document.getElementById('result').innerHTML = '<p>Searching... <span id="status">PENDING</span></p>';
+
+    fetch('/similar/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({
+            url: url,
+            cnt: parseInt(cnt)
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        const taskId = data.task_id;
+        checkStatus(taskId);
+    });
+});
+
+function checkStatus(taskId) {
+    fetch(`/tasks/${taskId}/status/`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('status').textContent = data.status;
+
+            if (data.status === 'PENDING' || data.status === 'STARTED') {
+                setTimeout(() => checkStatus(taskId), 2000);
+            } else if (data.status === 'SUCCESS') {
+                showResults(data.result);
+            } else if (data.status === 'FAILURE') {
+                document.getElementById('result').innerHTML =
+                    '<p style="color: red;">Error: ' + data.error + '</p>';
+            }
+        });
+}
+
+function showResults(result) {
+    let html = `<h1>Films, similar to ${result.query_film}:</h1>`;
+
+    result.films.forEach(film => {
+        html += `
+            <h2><a href="${film.url}">${film.title}</a></h2>
+            <p>${film.summary}</p>
+            <hr>
+        `;
+    });
+
+    document.getElementById('result').innerHTML = html;
+}
+</script>
