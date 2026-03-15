@@ -6,3 +6,4 @@ bs4
 requests
 pandas
 psycopg2-binary
+dj-database-url

@@ -3,3 +3,4 @@
 **.npz
 **.pickle
 **.sqlite3
+.env
