@@ -3,4 +3,23 @@
 **.npz
 **.pickle
 **.sqlite3
-.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Virtual environment
+venv/
+env/
+ENV/
+.env/
+
+# Development tools
+.tox/
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/

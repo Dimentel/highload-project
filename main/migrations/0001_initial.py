@@ -5,42 +5,72 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='Article',
+            name="Article",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('number', models.IntegerField()),
-                ('title', models.CharField(max_length=100)),
-                ('url', models.CharField(max_length=100)),
-                ('summary', models.CharField(max_length=5000)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
+                ("number", models.IntegerField()),
+                ("title", models.CharField(max_length=100)),
+                ("url", models.CharField(max_length=100)),
+                ("summary", models.CharField(max_length=5000)),
             ],
         ),
         migrations.CreateModel(
-            name='TaskStatus',
+            name="TaskStatus",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('task_id', models.CharField(db_index=True, max_length=255)),
-                ('task_type', models.CharField(choices=[('train', 'Обучение модели'), ('similar', 'Поиск похожих фильмов')], max_length=20)),
-                ('status', models.CharField(choices=[('PENDING', 'Ожидает'), ('STARTED', 'Выполняется'), ('SUCCESS', 'Успешно завершено'), ('FAILURE', 'Ошибка'), ('RETRY', 'Повторная попытка')], default='PENDING', max_length=20)),
-                ('params', models.JSONField(blank=True, default=dict)),
-                ('result', models.JSONField(blank=True, null=True)),
-                ('error_message', models.TextField(blank=True, default='', null=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('started_at', models.DateTimeField(blank=True, null=True)),
-                ('completed_at', models.DateTimeField(blank=True, null=True)),
-                ('worker_id', models.CharField(blank=True, max_length=100)),
-                ('retry_count', models.IntegerField(default=0)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, editable=False, primary_key=True, serialize=False
+                    ),
+                ),
+                ("task_id", models.CharField(db_index=True, max_length=255)),
+                (
+                    "task_type",
+                    models.CharField(
+                        choices=[
+                            ("train", "Обучение модели"),
+                            ("similar", "Поиск похожих фильмов"),
+                        ],
+                        max_length=20,
+                    ),
+                ),
+                (
+                    "status",
+                    models.CharField(
+                        choices=[
+                            ("PENDING", "Ожидает"),
+                            ("STARTED", "Выполняется"),
+                            ("SUCCESS", "Успешно завершено"),
+                            ("FAILURE", "Ошибка"),
+                            ("RETRY", "Повторная попытка"),
+                        ],
+                        default="PENDING",
+                        max_length=20,
+                    ),
+                ),
+                ("params", models.JSONField(blank=True, default=dict)),
+                ("result", models.JSONField(blank=True, null=True)),
+                ("error_message", models.TextField(blank=True, default="", null=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                ("started_at", models.DateTimeField(blank=True, null=True)),
+                ("completed_at", models.DateTimeField(blank=True, null=True)),
+                ("worker_id", models.CharField(blank=True, max_length=100)),
+                ("retry_count", models.IntegerField(default=0)),
             ],
             options={
-                'ordering': ['-created_at'],
+                "ordering": ["-created_at"],
             },
         ),
     ]

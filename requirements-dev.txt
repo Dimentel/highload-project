@@ -1,0 +1,7 @@
+# Code quality tools
+pre-commit>=4.5.0
+ruff>=0.14.9
+codespell>=2.4.1
+shellcheck-py>=0.11.0.1
+
+# Prettier and its plugins are handled via pre-commit

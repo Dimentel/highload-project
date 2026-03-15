@@ -1,48 +1,73 @@
 # Movie Similarity Service
-Сервис для поиска похожих фильмов по сюжетам из Wikipedia с асинхронной обработкой задач.
+
+Сервис для поиска похожих фильмов по сюжетам из Wikipedia с асинхронной
+обработкой задач.
+
 ## Особенности
+
 - Поиск похожих фильмов по тексту сюжета с использованием TF-IDF
 - Асинхронная обработка через Celery + RabbitMQ
-- Веб-интерфейс для ввода URL Wikipedia страницы
-- Использование PostgreSQL для хранения данных
+- Production-окружение с Nginx (reverse proxy + статика)
+- PostgreSQL для хранения данных и статусов задач
 - Мониторинг через Flower
-- Docker Compose для простого развертывания
+- Полная контейнеризация с Docker Compose
 
 ## Запускаем сервер
-### С Docker Compose (рекомендуется)
-**1. Клонируйте репозиторий:**
-   ```bash
-   git clone <repository-url>
-   cd highload-project
-   ``` 
-**2. Запустите проект:**
-   ```bash
-   docker-compose up -d
-   ```
-**3. Проверьте статус:**
-   ```bash
-   docker-compose ps
-   ```
-Должны быть запущены: similar_movies_db, similar_movies_app, similar_movies_celery, similar_movies_rmq, similar_movies_flower   
 
-**4. Инициализируйте данные:**  
+### С Docker Compose (рекомендуется)
+
+**1. Клонируйте репозиторий:**
+
+```bash
+git clone <repository-url>
+cd highload-project
+```
+
+**2. Запустите проект:**
+
+```bash
+docker-compose up -d
+```
+
+**3. Проверьте статус:**
+
+```bash
+docker-compose ps
+```
+
+Должны быть запущены все сервисы:
+
+- similar_movies_reverse_proxy - Nginx (порт 80)
+- similar_movies_static - Nginx для статики
+- similar_movies_app - Django + Gunicorn
+- similar_movies_celery - Celery worker
+- similar_movies_rmq - RabbitMQ
+- similar_movies_db - PostgreSQL
+- similar_movies_flower - Flower мониторинг
+
+**4. Инициализируйте данные:**
+
 - Откройте в браузере http://localhost:8000/train/.
 - Нажмите "Start Training" и дождитесь завершения
 - Статус обучения можно отслеживать на той же странице
 
-**5. Поиск похожих фильмов:**  
-- Перейдите на главную страницу: http://localhost:8000/.  
-- Введите URL Wikipedia страницы фильма (например: https://en.wikipedia.org/wiki/Inception).  
-- Выберите количество похожих фильмов для поиска (5, 10, 15, 20) и нажмите "Search".
+**5. Поиск похожих фильмов:**
+
+- Перейдите на главную страницу: http://localhost:/.
+- Введите URL Wikipedia страницы фильма (например:
+  https://en.wikipedia.org/wiki/Inception).
+- Выберите количество похожих фильмов для поиска (5, 10, 15, 20) и нажмите
+  "Search".
 - Результаты появятся после завершения обработки
 
-**Мониторинг:**  
-- Flower: http://localhost:5555 — мониторинг Celery задач  
+**Мониторинг:**
+
+- Flower: http://localhost:5555 — мониторинг Celery задач
 - RabbitMQ: http://localhost:15672 (логин: student, пароль: qwerty)
 
-**Конфигурация:**  
-Файл .env содержит настройки (создайте если отсутствует):
-   ```bash
+**Конфигурация:** Файл .env содержит настройки (создайте если отсутствует):
+
+```bash
 # Database
 DB_USER=similar_user
 DB_PASS=similar_pass
@@ -50,14 +75,14 @@ DB_NAME=similar_movies
 DB_HOST=db
 DB_PORT=5432
 
-# Django
+# Django development secret key - development-secret-key-change-in-production
 DJANGO_SETTINGS_MODULE=review2.settings
-DJANGO_SECRET_KEY=development-secret-key-change-in-production
-DJANGO_DEBUG=True
-DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,web
+DJANGO_SECRET_KEY=production-secret-key
+DJANGO_DEBUG=False
+DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,nginx,web
 
 # Application settings
-num_articles=1000
+NUM_ARTICLES=1000
 PYTHONUNBUFFERED=1
 
 # Database URL
@@ -100,4 +125,13 @@ UPDATE_TASK_STATUS_URL=${API_URL}/tasks/status/
 # Timeouts
 TRAIN_TIMEOUT=300
 SIMILAR_TIMEOUT=60
+
+# Static files
+STATIC_URL=/static/
+STATIC_ROOT=/app/staticfiles
+STATICFILES_STORAGE=whitenoise.storage.CompressedManifestStaticFilesStorage
+
+# Gunicorn
+GUNICORN_WORKERS=3
+GUNICORN_TIMEOUT=120
 ```
