@@ -3,7 +3,7 @@ FROM python:3.12-slim
 # Установка netcat для проверки доступности PostgreSQL
 RUN apt-get update && apt-get install -y \
     netcat-openbsd \
-    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY requirements.txt .

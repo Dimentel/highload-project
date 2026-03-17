@@ -11,10 +11,11 @@
 - PostgreSQL для хранения данных и статусов задач
 - Мониторинг через Flower
 - Полная контейнеризация с Docker Compose
+- Поддержка Kubernetes (развертывание в Minikube или полноценном кластере)
 
 ## Запускаем сервер
 
-### С Docker Compose (рекомендуется)
+### С Docker Compose
 
 **1. Клонируйте репозиторий:**
 
@@ -60,12 +61,65 @@ docker-compose ps
   "Search".
 - Результаты появятся после завершения обработки
 
-**Мониторинг:**
+### Развертывание в Kubernetes (Minikube)
 
-- Flower: http://localhost:5555 — мониторинг Celery задач
-- RabbitMQ: http://localhost:15672 (логин: student, пароль: qwerty)
+**Предварительные требования:**
 
-**Конфигурация:** Файл .env содержит настройки (создайте если отсутствует):
+- Установленный Minikube и kubectl
+- Linux (рекомендуется) или macOS
+- репозиторий склонирован и текущая папка - папка проекта
+
+**Запустите Minikube:**
+
+- minikube start --driver=docker
+- minikube addons enable ingress
+
+**1. Создайте namespace и примените конфигурации**
+
+kubectl apply -f namespace.yaml kubectl apply -f configmap.yaml kubectl apply -f
+secrets.yaml
+
+Создайте секрет для доступа к Docker registry (замените токен): kubectl create
+secret docker-registry registrysecret \
+ --docker-server=registry.gitlab.akhcheck.ru \
+ --docker-username=dmitrii.boldyrev \
+ --docker-password=<ваш_токен> \
+ --docker-email=daboldyrev@edu.hse.ru \
+ -n hl-project
+
+Примените остальные манифесты: kubectl apply -f pvc/ kubectl apply -f
+statefulset/ kubectl apply -f job/ kubectl apply -f deployment/ kubectl apply -f
+service/ kubectl apply -f ingress.yaml
+
+Можно выполнить одну команду ./deploy.bash
+
+**2. Дождитесь запуска всех подов:** ubectl get pods -n hl-project -w
+
+**3. Добавьте запись в /etc/hosts (на Linux):** echo "$(minikube ip)
+hl-project.test" | sudo tee -a /etc/hosts
+
+Доступ к сервисам Kubernetes Приложение: http://hl-project.test Flower
+мониторинг: http://hl-project.test:5555 RabbitMQ management:
+http://hl-project.test:15672 (логин: student, пароль: qwerty)
+
+**Управление кластером:**
+
+# Просмотр статуса подов
+
+kubectl get pods -n hl-project
+
+# Логи приложения
+
+kubectl logs -n hl-project -l app=web
+
+# Перезапуск подов
+
+kubectl delete pod -n hl-project -l app=web
+
+# Удаление всех ресурсов
+
+kubectl delete -f k8s/ **Конфигурация:** Файл .env содержит настройки (создайте
+если отсутствует):
 
 ```bash
 # Database
@@ -134,4 +188,12 @@ STATICFILES_STORAGE=whitenoise.storage.CompressedManifestStaticFilesStorage
 # Gunicorn
 GUNICORN_WORKERS=3
 GUNICORN_TIMEOUT=120
+
+REGISTRY_TOKEN=your-token
 ```
+
+**Примечания для разработчиков**
+
+- Docker Compose — для локальной разработки
+- Kubernetes — для production-развертывания На Linux все работает "из коробки",
+  на Windows возможны проблемы с Minikube (доступ к клсастеру) даже с WSL2.

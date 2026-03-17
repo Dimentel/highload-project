@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: static
+  namespace: hl-project
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: static
+  template:
+    metadata:
+      labels:
+        app: static
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.25-alpine
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "50m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+            - name: static-storage
+              mountPath: /usr/share/nginx/html/static
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: nginx-static-config
+        - name: static-storage
+          persistentVolumeClaim:
+            claimName: static-pvc
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-static-config
+  namespace: hl-project
+data:
+  default.conf: |
+    server {
+        listen 80;
+        server_name localhost;
+
+        location /static/ {
+            alias /usr/share/nginx/html/static/;
+            expires 30d;
+            add_header Cache-Control "public, immutable";
+            access_log off;
+        }
+
+        location / {
+            return 404;
+        }
+    }
