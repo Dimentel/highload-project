@@ -1,0 +1,52 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: django-migrate
+  namespace: hl-project
+spec:
+  template:
+    spec:
+      imagePullSecrets:
+        - name: registrysecret
+      initContainers:
+        - name: wait-postgres
+          image: alpine
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z postgres-service 5432; do
+                echo waiting for postgres;
+                sleep 2;
+              done
+        - name: wait-rabbitmq
+          image: alpine
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z rabbitmq-service 5672; do
+                echo waiting for rabbitmq;
+                sleep 2;
+              done
+      containers:
+        - name: migrate
+          image: registry.gitlab.akhcheck.ru/dmitrii.boldyrev/highload-project/hl-project:v1.0.0
+          command: ["python", "manage.py", "migrate"]
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          env:
+            - name: DATABASE_URL
+              value: "postgresql://$(DB_USER):$(DB_PASS)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)"
+          envFrom:
+            - configMapRef:
+                name: hl-project-config
+            - secretRef:
+                name: hl-project-secrets
+      restartPolicy: Never
+  backoffLimit: 3

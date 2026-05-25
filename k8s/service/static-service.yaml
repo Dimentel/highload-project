@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: static-service
+  namespace: hl-project
+spec:
+  selector:
+    app: static
+  ports:
+    - port: 80
+      targetPort: 80

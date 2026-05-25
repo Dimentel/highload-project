@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery
+  namespace: hl-project
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: celery
+  template:
+    metadata:
+      labels:
+        app: celery
+    spec:
+      imagePullSecrets:
+        - name: registrysecret
+      containers:
+        - name: celery
+          image: registry.gitlab.akhcheck.ru/dmitrii.boldyrev/highload-project/hl-project:v1.0.1
+          command:
+            - sh
+            - -c
+            - |
+              echo 'Waiting for RabbitMQ...' &&
+              while ! nc -z rabbitmq-service 5672; do
+                echo waiting for rabbitmq;
+                sleep 2;
+              done &&
+              echo 'RabbitMQ started' &&
+              celery -A review2.celery_app worker --loglevel=info
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+          env:
+            - name: CELERY_BROKER_URL
+              value: "amqp://$(RABBITMQ_USER):$(RABBITMQ_PASSWORD)@$(RABBITMQ_HOST):$(RABBITMQ_PORT)"
+            - name: DATABASE_URL
+              value: "postgresql://$(DB_USER):$(DB_PASS)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)"
+          envFrom:
+            - configMapRef:
+                name: hl-project-config
+            - secretRef:
+                name: hl-project-secrets
